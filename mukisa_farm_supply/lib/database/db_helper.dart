@@ -17,15 +17,37 @@ class DBHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    return await openDatabase(
-  path,
-  version: 2, // ⬅️ increment version
-  onCreate: _createDB,
-  onUpgrade: _upgradeDB,
-);
-
+      return await openDatabase(
+        path,
+        version: 3, // bumped for added_date in products
+        onCreate: _createDB,
+        onUpgrade: _upgradeDB,
+        onOpen: (db) async {
+          // Ensure sales table exists for older DBs that may not have been upgraded
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS sales (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              product_id INTEGER,
+              quantity_pieces INTEGER,
+              sell_price REAL,
+              total_amount REAL,
+              role TEXT,
+              date TEXT
+            )
+          ''');
+          // Ensure products table has added_date column on older DBs
+          final columns = await db.rawQuery("PRAGMA table_info(products);");
+          final hasAddedDate = columns.any((c) => c['name'] == 'added_date');
+          if (!hasAddedDate) {
+            try {
+              await db.execute('ALTER TABLE products ADD COLUMN added_date TEXT');
+            } catch (_) {}
+          }
+        },
+      );
   }
 
+  // Called only when database is first created
   Future _createDB(Database db, int version) async {
     await db.execute('''
       CREATE TABLE products (
@@ -36,23 +58,32 @@ class DBHelper {
         sell_price REAL,
         quantity INTEGER,
         unit TEXT,
-        reorder_level INTEGER
+        reorder_level INTEGER,
+        added_date TEXT
       )
     ''');
   }
+
+  // Called automatically if version is increased
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
-  if (oldVersion < 2) {
-    await db.execute('''
-      CREATE TABLE sales (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        product_id INTEGER,
-        quantity_pieces INTEGER,
-        sell_price REAL,
-        total_amount REAL,
-        role TEXT,
-        date TEXT
-      )
-    ''');
+    if (oldVersion < 2) {
+      await db.execute('''
+        CREATE TABLE sales (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          product_id INTEGER,
+          quantity_pieces INTEGER,
+          sell_price REAL,
+          total_amount REAL,
+          role TEXT,
+          date TEXT
+        )
+      ''');
+    }
+    if (oldVersion < 3) {
+      // add added_date column to products
+      try {
+        await db.execute('ALTER TABLE products ADD COLUMN added_date TEXT');
+      } catch (_) {}
+    }
   }
-}
 }

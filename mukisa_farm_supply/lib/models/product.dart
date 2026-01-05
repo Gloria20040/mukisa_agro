@@ -7,6 +7,7 @@ class Product {
   final int quantity;
   final String unit;
   final int reorderLevel;
+  final String? addedDate;
 
   Product({
     this.id,
@@ -17,6 +18,7 @@ class Product {
     required this.quantity,
     required this.unit,
     required this.reorderLevel,
+    this.addedDate,
   });
 
   Map<String, dynamic> toMap() {
@@ -29,6 +31,7 @@ class Product {
       'quantity': quantity,
       'unit': unit,
       'reorder_level': reorderLevel,
+      'added_date': addedDate,
     };
   }
 
@@ -42,6 +45,7 @@ class Product {
       quantity: map['quantity'],
       unit: map['unit'] ?? 'Pieces',
       reorderLevel: map['reorder_level'],
+      addedDate: map['added_date'],
     );
   }
 }

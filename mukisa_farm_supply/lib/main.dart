@@ -5,10 +5,11 @@ import 'package:provider/provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'providers/product_provider.dart';
-import 'screens/product_list_screen.dart';
+import 'providers/sales_provider.dart';
+import 'screens/role_selection.dart';
 
 void main() {
-  // Initialize sqflite FFI for desktop platforms (Windows/Linux/MacOS)
+  // Initialize sqflite FFI for desktop platforms
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
@@ -18,6 +19,7 @@ void main() {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ProductProvider()),
+        ChangeNotifierProvider(create: (_) => SalesProvider()), // ✅ REQUIRED
       ],
       child: const MyApp(),
     ),
@@ -34,7 +36,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
       ),
-      home: const ProductListScreen(),
+      home: const RoleSelectionScreen(),
     );
   }
 }

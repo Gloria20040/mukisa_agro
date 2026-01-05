@@ -4,13 +4,18 @@ import '../models/product.dart';
 
 class ProductProvider with ChangeNotifier {
   List<Product> _products = [];
+  List<Product> _filteredProducts = [];
 
   List<Product> get products => _products;
+  List<Product> get filteredProducts =>
+      _filteredProducts.isEmpty ? _products : _filteredProducts;
 
   Future<void> loadProducts() async {
     final db = await DBHelper.instance.database;
     final data = await db.query('products');
     _products = data.map((e) => Product.fromMap(e)).toList();
+    // initialize filtered list
+    _filteredProducts = List<Product>.from(_products);
     notifyListeners();
   }
 
@@ -40,5 +45,23 @@ class ProductProvider with ChangeNotifier {
       whereArgs: [id],
     );
     await loadProducts();
+  }
+
+  /// Filter products by [query] (case-insensitive). Pass empty string to clear filter.
+  void filterProducts(String query) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) {
+      _filteredProducts = List<Product>.from(_products);
+    } else {
+      _filteredProducts = _products
+          .where((p) => p.name.toLowerCase().contains(q))
+          .toList();
+    }
+    notifyListeners();
+  }
+
+  void clearFilter() {
+    _filteredProducts = List<Product>.from(_products);
+    notifyListeners();
   }
 }

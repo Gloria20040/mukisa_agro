@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/product.dart';
 import '../providers/product_provider.dart';
+import 'role_selection.dart';
 
 class AddProductScreen extends StatefulWidget {
   final Product? product;
@@ -45,6 +46,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       _quantityController.text = p.quantity.toString();
       _reorderController.text = p.reorderLevel.toString();
       _unit = p.unit;
+      // existing product may have added date, keep it in hidden state
     }
   }
 
@@ -53,7 +55,22 @@ class _AddProductScreenState extends State<AddProductScreen> {
     final isEditing = widget.product != null;
 
     return Scaffold(
-    appBar: AppBar(title: Text(isEditing ? 'Edit Product' : 'Add Product')),
+    appBar: AppBar(
+      title: Text(isEditing ? 'Edit Product' : 'Add Product'),
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () {
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
+            );
+          }
+        },
+      ),
+    ),
     body: Padding(
       padding: const EdgeInsets.all(16),
       child: Form(
@@ -140,11 +157,21 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     labelText: 'Unit',
                     border: OutlineInputBorder(),
                   ),
-                  items: const [
-                    'Kilograms',
-                    'Litres',
-                    'Pieces',
-                  ].map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                      items: const [
+                        '50ml',
+                        '100ml',
+                        '250ml',
+                        '500ml',
+                        '100g',
+                        '240g',
+                        '250g',
+                        '500g',
+                        'Kilograms',
+                        'Litre',
+                        '20L',
+                        '5L',
+                        'Pieces',
+                      ].map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
                   onChanged: (v) => setState(() => _unit = v ?? 'Pieces'),
                 ),
               ),
@@ -167,19 +194,33 @@ class _AddProductScreenState extends State<AddProductScreen> {
               child: ElevatedButton(
                 onPressed: () async {
                   if (_formKey.currentState!.validate()) {
+                    final int newQty = int.parse(_quantityController.text);
+                    String? addedDate = widget.product?.addedDate;
+
+                    // if creating new product, set addedDate to now
+                    if (!isEditing) {
+                      addedDate = DateTime.now().toIso8601String();
+                    } else {
+                      // if editing and quantity changed, update addedDate
+                      final oldQty = widget.product!.quantity;
+                      if (newQty != oldQty) {
+                        addedDate = DateTime.now().toIso8601String();
+                      }
+                    }
+
                     final product = Product(
                       id: widget.product?.id,
                       name: _nameController.text,
                       category: _categoryController.text,
                       costPrice: double.parse(_costController.text),
                       sellPrice: double.parse(_sellController.text),
-                      quantity: int.parse(_quantityController.text),
+                      quantity: newQty,
                       unit: _unit,
                       reorderLevel: int.parse(_reorderController.text),
+                      addedDate: addedDate,
                     );
 
-                    final providerRef =
-                        Provider.of<ProductProvider>(context, listen: false);
+                    final providerRef = Provider.of<ProductProvider>(context, listen: false);
                     final navigator = Navigator.of(context);
 
                     if (isEditing) {
