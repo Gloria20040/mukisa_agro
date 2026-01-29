@@ -17,6 +17,7 @@ class SalesScreen extends StatefulWidget {
 class _SalesScreenState extends State<SalesScreen> {
   Product? selectedProduct;
   final _qtyController = TextEditingController();
+  final _priceController = TextEditingController();
   bool _controllerListenerAdded = false;
   double total = 0;
 
@@ -35,14 +36,16 @@ class _SalesScreenState extends State<SalesScreen> {
     }
 
     final qty = int.tryParse(_qtyController.text) ?? 0;
+    final price = double.tryParse(_priceController.text) ?? selectedProduct!.sellPrice;
     setState(() {
-      total = qty * selectedProduct!.sellPrice;
+      total = qty * price;
     });
   }
 
   @override
   void dispose() {
     _qtyController.dispose();
+    _priceController.dispose();
     super.dispose();
   }
 
@@ -130,6 +133,7 @@ class _SalesScreenState extends State<SalesScreen> {
               onSelected: (Product selection) {
                 setState(() {
                   selectedProduct = selection;
+                  _priceController.text = selection.sellPrice.toStringAsFixed(0);
                   calculateTotal();
                 });
               },
@@ -150,6 +154,20 @@ class _SalesScreenState extends State<SalesScreen> {
 
             const SizedBox(height: 16),
 
+            // PRICE INPUT (editable for discounts)
+            if (selectedProduct != null)
+              TextField(
+                controller: _priceController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Unit Price (UGX) - editable for discounts',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (_) => calculateTotal(),
+              ),
+
+            if (selectedProduct != null) const SizedBox(height: 16),
+
             // TOTAL
             Container(
               padding: const EdgeInsets.all(16),
@@ -167,7 +185,7 @@ class _SalesScreenState extends State<SalesScreen> {
               ),
             ),
 
-            const Spacer(),
+            const SizedBox(height: 12),
 
             // SELL BUTTON
             SizedBox(
@@ -218,12 +236,13 @@ class _SalesScreenState extends State<SalesScreen> {
                       final currentQty = rows.first['quantity'] as int;
                       if (currentQty < qty) throw Exception('Insufficient stock');
 
-                      final totalAmount = qty * selectedProduct!.sellPrice;
+                      final price = double.tryParse(_priceController.text) ?? selectedProduct!.sellPrice;
+                      final totalAmount = qty * price;
 
                       await txn.insert('sales', {
                         'product_id': selectedProduct!.id,
                         'quantity_pieces': qty,
-                        'sell_price': selectedProduct!.sellPrice,
+                        'sell_price': price,
                         'total_amount': totalAmount,
                         'role': widget.role,
                         'date': DateTime.now().toIso8601String(),
