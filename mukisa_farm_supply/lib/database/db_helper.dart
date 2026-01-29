@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:crypto/crypto.dart';
 
 class DBHelper {
   static final DBHelper instance = DBHelper._init();
@@ -23,6 +26,32 @@ class DBHelper {
         onCreate: _createDB,
         onUpgrade: _upgradeDB,
         onOpen: (db) async {
+          // Ensure users table exists and seed defaults if empty
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              username TEXT UNIQUE,
+              password_hash TEXT,
+              role TEXT
+            )
+          ''');
+
+          final countRes = await db.rawQuery('SELECT COUNT(*) as cnt FROM users');
+          final cnt = countRes.isNotEmpty ? (countRes.first['cnt'] as int) : 0;
+          if (cnt == 0) {
+            // seed default users: admin/admin123 and sales/sales123 (hashed)
+            String hash(String s) => sha256.convert(utf8.encode(s)).toString();
+            await db.insert('users', {
+              'username': 'admin',
+              'password_hash': hash('admin123'),
+              'role': 'admin'
+            });
+            await db.insert('users', {
+              'username': 'sales',
+              'password_hash': hash('sales123'),
+              'role': 'sales'
+            });
+          }
           // Ensure sales table exists for older DBs that may not have been upgraded
           await db.execute('''
             CREATE TABLE IF NOT EXISTS sales (
@@ -32,7 +61,8 @@ class DBHelper {
               sell_price REAL,
               total_amount REAL,
               role TEXT,
-              date TEXT
+              date TEXT,
+              archived INTEGER DEFAULT 0
             )
           ''');
           // Ensure products table has added_date column on older DBs
@@ -41,6 +71,14 @@ class DBHelper {
           if (!hasAddedDate) {
             try {
               await db.execute('ALTER TABLE products ADD COLUMN added_date TEXT');
+            } catch (_) {}
+          }
+          // Ensure sales table has archived column
+          final salesColumns = await db.rawQuery("PRAGMA table_info(sales);");
+          final hasArchived = salesColumns.any((c) => c['name'] == 'archived');
+          if (!hasArchived) {
+            try {
+              await db.execute('ALTER TABLE sales ADD COLUMN archived INTEGER DEFAULT 0');
             } catch (_) {}
           }
         },

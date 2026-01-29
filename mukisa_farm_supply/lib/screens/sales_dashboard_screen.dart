@@ -34,7 +34,7 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
 
     // Totals for the day
     final totalRow = await db.rawQuery(
-      'SELECT SUM(total_amount) as total, SUM(quantity_pieces) as items, COUNT(*) as cnt FROM sales WHERE date >= ? AND date < ?',
+      'SELECT SUM(total_amount) as total, SUM(quantity_pieces) as items, COUNT(*) as cnt FROM sales WHERE date >= ? AND date < ? AND (archived IS NULL OR archived = 0)',
       [start.toIso8601String(), end.toIso8601String()],
     );
     final row = totalRow.isNotEmpty ? totalRow.first : {};
@@ -44,7 +44,7 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
       SELECT s.*, p.name as product_name
       FROM sales s
       LEFT JOIN products p ON p.id = s.product_id
-      WHERE s.date >= ? AND s.date < ?
+      WHERE s.date >= ? AND s.date < ? AND (s.archived IS NULL OR s.archived = 0)
       ORDER BY s.date DESC
     ''', [start.toIso8601String(), end.toIso8601String()]);
 
@@ -75,56 +75,6 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
     if (picked != null) {
       setState(() => _selectedDate = picked);
       await _loadStatsForDate(picked);
-    }
-  }
-
-  Future<void> _clearSalesForDate() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Confirm clear'),
-        content: Text('Delete all sales for ${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}? This will also restore product stock.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    setState(() {
-      _loading = true;
-    });
-
-    final start = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
-    final end = start.add(const Duration(days: 1));
-    final db = await DBHelper.instance.database;
-
-    try {
-      await db.transaction((txn) async {
-        final rows = await txn.rawQuery('SELECT * FROM sales WHERE date >= ? AND date < ?', [start.toIso8601String(), end.toIso8601String()]);
-        for (final r in rows) {
-          final pid = r['product_id'] as int?;
-          final qty = r['quantity_pieces'] as int? ?? 0;
-          final id = r['id'] as int?;
-          if (pid != null) {
-            final prodRows = await txn.query('products', where: 'id = ?', whereArgs: [pid]);
-            if (prodRows.isNotEmpty) {
-              final current = prodRows.first['quantity'] as int;
-              await txn.update('products', {'quantity': current + qty}, where: 'id = ?', whereArgs: [pid]);
-            }
-          }
-          if (id != null) {
-            await txn.delete('sales', where: 'id = ?', whereArgs: [id]);
-          }
-        }
-      });
-
-      await _loadStatsForDate(_selectedDate);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sales for date cleared')));
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error clearing sales: $e')));
     }
   }
 
@@ -201,13 +151,6 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  // Admin action: clear sales for selected date
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.delete_forever),
-                    label: const Text('Clear sales for this date'),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red, padding: const EdgeInsets.all(12)),
-                    onPressed: _clearSalesForDate,
-                  ),
                   const SizedBox(height: 16),
                   const Text('Sales', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),

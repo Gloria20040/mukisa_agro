@@ -151,29 +151,38 @@ class _AddProductScreenState extends State<AddProductScreen> {
               const SizedBox(width: 12),
               Expanded(
                 flex: 1,
-                child: DropdownButtonFormField<String>(
-                  initialValue: _unit,
-                  decoration: const InputDecoration(
-                    labelText: 'Unit',
-                    border: OutlineInputBorder(),
-                  ),
-                      items: const [
-                        '50ml',
-                        '100ml',
-                        '250ml',
-                        '500ml',
-                        '100g',
-                        '240g',
-                        '250g',
-                        '500g',
-                        'Kilograms',
-                        'Litre',
-                        '20L',
-                        '5L',
-                        'Pieces',
-                      ].map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
-                  onChanged: (v) => setState(() => _unit = v ?? 'Pieces'),
-                ),
+                child: Builder(builder: (ctx) {
+                  final unitOptions = <String>[
+                    '50ml',
+                    '100ml',
+                    '250ml',
+                    '500ml',
+                    '100g',
+                    '240g',
+                    '250g',
+                    '500g',
+                    'Kilograms',
+                    'Litre',
+                    '20L',
+                    '5L',
+                    'Pieces',
+                  ];
+                  // If the existing product has a unit not in the list (e.g. 'Litres'),
+                  // include it so DropdownButtonFormField's initialValue is valid.
+                  if (_unit.isNotEmpty && !unitOptions.contains(_unit)) {
+                    unitOptions.insert(0, _unit);
+                  }
+
+                  return DropdownButtonFormField<String>(
+                    initialValue: unitOptions.contains(_unit) ? _unit : null,
+                    decoration: const InputDecoration(
+                      labelText: 'Unit',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: unitOptions.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                    onChanged: (v) => setState(() => _unit = v ?? 'Pieces'),
+                  );
+                }),
               ),
               const SizedBox(width: 12),
               Expanded(

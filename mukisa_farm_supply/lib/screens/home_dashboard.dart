@@ -98,7 +98,7 @@ class HomeDashboardScreen extends StatelessWidget {
                 style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(16)),
                 onPressed: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => ProductListScreen(role: role)),
+                    MaterialPageRoute(builder: (_) => const ProductListScreen()),
                   );
                 },
               ),

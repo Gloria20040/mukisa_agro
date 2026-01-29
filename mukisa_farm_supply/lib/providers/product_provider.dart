@@ -28,9 +28,12 @@ class ProductProvider with ChangeNotifier {
   Future<void> updateProduct(Product product) async {
     if (product.id == null) return;
     final db = await DBHelper.instance.database;
+    // Remove 'id' from the map to avoid attempting to update the primary key.
+    final values = Map<String, dynamic>.from(product.toMap());
+    values.remove('id');
     await db.update(
       'products',
-      product.toMap(),
+      values,
       where: 'id = ?',
       whereArgs: [product.id],
     );

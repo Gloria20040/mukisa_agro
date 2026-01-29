@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
 import '../database/db_helper.dart';
+import '../providers/auth_provider.dart';
 import 'sales_dashboard_screen.dart';
 import 'role_selection.dart';
 
 class SalesListScreen extends StatefulWidget {
-  final String? role;
   const SalesListScreen({super.key, this.role});
+  final String? role;
 
   @override
   State<SalesListScreen> createState() => _SalesListScreenState();
@@ -22,12 +25,14 @@ class _SalesListScreenState extends State<SalesListScreen> {
   }
 
   Future<void> _loadSales() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final role = auth.currentUser?['role'] as String? ?? widget.role;
     final db = await DBHelper.instance.database;
 
     String sql;
     List args = [];
 
-    if (widget.role == 'sales') {
+      if (role == 'sales') {
       // show only today's sales made by sales role
       final now = DateTime.now();
       final start = DateTime(now.year, now.month, now.day).toIso8601String();
@@ -36,7 +41,7 @@ class _SalesListScreenState extends State<SalesListScreen> {
         SELECT s.*, p.name as product_name
         FROM sales s
         LEFT JOIN products p ON p.id = s.product_id
-        WHERE s.date >= ? AND s.date < ? AND s.role = ?
+        WHERE s.date >= ? AND s.date < ? AND s.role = ? AND (s.archived IS NULL OR s.archived = 0)
         ORDER BY date DESC
       ''';
       args = [start, end, 'sales'];
@@ -45,6 +50,7 @@ class _SalesListScreenState extends State<SalesListScreen> {
         SELECT s.*, p.name as product_name
         FROM sales s
         LEFT JOIN products p ON p.id = s.product_id
+        WHERE (s.archived IS NULL OR s.archived = 0)
         ORDER BY date DESC
       ''';
       args = [];
@@ -65,7 +71,9 @@ class _SalesListScreenState extends State<SalesListScreen> {
     final messenger = ScaffoldMessenger.of(context);
 
     // only admin may cancel sales
-    if (widget.role != 'admin') {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final role = auth.currentUser?['role'] as String? ?? widget.role;
+    if (role != 'admin') {
       messenger.showSnackBar(const SnackBar(content: Text('You are not allowed to cancel sales')));
       return;
     }
@@ -97,7 +105,8 @@ class _SalesListScreenState extends State<SalesListScreen> {
         }
       }
 
-      await txn.delete('sales', where: 'id = ?', whereArgs: [id]);
+      // mark sale as archived instead of deleting
+      await txn.update('sales', {'archived': 1}, where: 'id = ?', whereArgs: [id]);
     });
 
     await _loadSales();
@@ -162,7 +171,9 @@ class _SalesListScreenState extends State<SalesListScreen> {
                     final showHeader = i == 0 || prevDateOnly != dateOnly;
 
                     final diff = date == null ? const Duration(days: 365) : DateTime.now().difference(date);
-                    final canCancel = (widget.role == 'admin') && diff <= const Duration(minutes: 10);
+                    final auth = Provider.of<AuthProvider>(context, listen: false);
+                    final roleForCancel = auth.currentUser?['role'] as String? ?? widget.role;
+                    final canCancel = (roleForCancel == 'admin') && diff <= const Duration(minutes: 10);
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
